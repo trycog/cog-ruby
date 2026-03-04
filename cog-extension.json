@@ -1,0 +1,17 @@
+{
+  "name": "cog-ruby",
+  "extensions": [".rb", ".rake", ".gemspec"],
+  "args": ["{file}", "--output", "{output}"],
+  "build": "chmod +x bin/cog-ruby",
+  "language_names": ["ruby"],
+  "debugger": {
+    "type": "dap",
+    "adapter": {
+      "command": "rdbg",
+      "args": ["--open", "--port", ":{port}"],
+      "transport": "tcp"
+    },
+    "launch_args": "{\"cwd\":\"{cwd}\"}",
+    "boundary_markers": ["<internal_frame>"]
+  }
+}
