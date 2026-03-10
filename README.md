@@ -164,6 +164,18 @@ bin/cog-ruby --output /tmp/test.scip test/fixtures/sample.rb
 protoc --decode_raw < /tmp/test.scip
 ```
 
+### Indexing diagnostics
+
+Enable structured debug logging for per-file timing and memory snapshots:
+
+```sh
+COG_RUBY_DEBUG=1 bin/cog-ruby --output /tmp/test.scip test/fixtures/sample.rb 2> /tmp/cog-ruby-debug.log
+```
+
+With `COG_RUBY_DEBUG=1`, the indexer emits debug events for batch start/finish,
+per-file start/finish, read/analyze stage timings, watchdog `file_still_running`
+events, and memory snapshots.
+
 ### Install locally
 
 ```sh
