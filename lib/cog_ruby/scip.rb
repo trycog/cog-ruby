@@ -27,37 +27,40 @@ module CogRuby
     end
 
     Metadata = Struct.new(:version, :tool_info, :project_root, :text_document_encoding, keyword_init: true) do
-      def initialize(version: 0, tool_info: nil, project_root: "", text_document_encoding: 1)
+      def initialize(version: 0, tool_info: nil, project_root: '', text_document_encoding: 1)
         super
       end
     end
 
     ToolInfo = Struct.new(:name, :version, :arguments, keyword_init: true) do
-      def initialize(name: "", version: "", arguments: [])
+      def initialize(name: '', version: '', arguments: [])
         super
       end
     end
 
     Document = Struct.new(:language, :relative_path, :occurrences, :symbols, keyword_init: true) do
-      def initialize(language: "ruby", relative_path: "", occurrences: [], symbols: [])
+      def initialize(language: 'ruby', relative_path: '', occurrences: [], symbols: [])
         super
       end
     end
 
     Occurrence = Struct.new(:range, :symbol, :symbol_roles, :syntax_kind, :enclosing_range, keyword_init: true) do
-      def initialize(range: [], symbol: "", symbol_roles: 0, syntax_kind: 0, enclosing_range: [])
+      def initialize(range: [], symbol: '', symbol_roles: 0, syntax_kind: 0, enclosing_range: [])
         super
       end
     end
 
-    SymbolInformation = Struct.new(:symbol, :documentation, :relationships, :kind, :display_name, :enclosing_symbol, keyword_init: true) do
-      def initialize(symbol: "", documentation: [], relationships: [], kind: 0, display_name: "", enclosing_symbol: "")
+    SymbolInformation = Struct.new(:symbol, :documentation, :relationships, :kind, :display_name, :enclosing_symbol,
+                                   keyword_init: true) do
+      def initialize(symbol: '', documentation: [], relationships: [], kind: 0, display_name: '', enclosing_symbol: '')
         super
       end
     end
 
-    Relationship = Struct.new(:symbol, :is_reference, :is_implementation, :is_type_definition, :is_definition, keyword_init: true) do
-      def initialize(symbol: "", is_reference: false, is_implementation: false, is_type_definition: false, is_definition: false)
+    Relationship = Struct.new(:symbol, :is_reference, :is_implementation, :is_type_definition, :is_definition, :kind,
+                              keyword_init: true) do
+      def initialize(symbol: '', is_reference: false, is_implementation: false, is_type_definition: false,
+                     is_definition: false, kind: '')
         super
       end
     end

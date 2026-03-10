@@ -11,7 +11,7 @@ module CogRuby
     # --- Low-level encoding ---
 
     def encode_varint(value)
-      value = value & 0xFFFFFFFFFFFFFFFF if value < 0
+      value &= 0xFFFFFFFFFFFFFFFF if value < 0
       buf = []
       loop do
         byte = value & 0x7F
@@ -23,7 +23,7 @@ module CogRuby
           buf << (byte | 0x80)
         end
       end
-      buf.pack("C*")
+      buf.pack('C*')
     end
 
     def encode_tag(field_number, wire_type)
@@ -33,47 +33,54 @@ module CogRuby
     # --- Field encoders ---
 
     def encode_string_field(field_number, value)
-      return "".b if value.nil? || value.empty?
+      return ''.b if value.nil? || value.empty?
+
       data = value.b
       encode_tag(field_number, WIRE_DELIMITED) + encode_varint(data.bytesize) + data
     end
 
     def encode_int32_field(field_number, value)
-      return "".b if value == 0
+      return ''.b if value == 0
+
       encode_tag(field_number, WIRE_VARINT) + encode_varint(value)
     end
 
     def encode_bool_field(field_number, value)
-      return "".b unless value
+      return ''.b unless value
+
       encode_tag(field_number, WIRE_VARINT) + encode_varint(1)
     end
 
     def encode_message_field(field_number, message_data)
       data = message_data.b
-      return "".b if data.empty?
+      return ''.b if data.empty?
+
       encode_tag(field_number, WIRE_DELIMITED) + encode_varint(data.bytesize) + data
     end
 
     def encode_packed_int32_field(field_number, values)
-      return "".b if values.empty?
+      return ''.b if values.empty?
+
       packed = values.map { |v| encode_varint(v) }.join.b
       encode_tag(field_number, WIRE_DELIMITED) + encode_varint(packed.bytesize) + packed
     end
 
     def encode_repeated_message_field(field_number, messages)
-      return "".b if messages.empty?
-      messages.map { |msg_data|
+      return ''.b if messages.empty?
+
+      messages.map do |msg_data|
         data = msg_data.b
         encode_tag(field_number, WIRE_DELIMITED) + encode_varint(data.bytesize) + data
-      }.join.b
+      end.join.b
     end
 
     def encode_repeated_string_field(field_number, strings)
-      return "".b if strings.empty?
-      strings.map { |s|
+      return ''.b if strings.empty?
+
+      strings.map do |s|
         data = s.b
         encode_tag(field_number, WIRE_DELIMITED) + encode_varint(data.bytesize) + data
-      }.join.b
+      end.join.b
     end
 
     # --- SCIP message encoders ---
@@ -87,7 +94,8 @@ module CogRuby
     end
 
     def encode_metadata(m)
-      return "".b if m.nil?
+      return ''.b if m.nil?
+
       parts = []
       parts << encode_int32_field(1, m.version)
       parts << encode_message_field(2, encode_tool_info(m.tool_info))
@@ -97,7 +105,8 @@ module CogRuby
     end
 
     def encode_tool_info(t)
-      return "".b if t.nil?
+      return ''.b if t.nil?
+
       parts = []
       parts << encode_string_field(1, t.name)
       parts << encode_string_field(2, t.version)
@@ -142,6 +151,7 @@ module CogRuby
       parts << encode_bool_field(3, r.is_implementation)
       parts << encode_bool_field(4, r.is_type_definition)
       parts << encode_bool_field(5, r.is_definition)
+      parts << encode_string_field(6, r.kind)
       parts.join.b
     end
   end

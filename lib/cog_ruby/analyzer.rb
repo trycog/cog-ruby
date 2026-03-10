@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "prism"
+require 'prism'
 
 module CogRuby
   class Analyzer
@@ -17,6 +17,8 @@ module CogRuby
       @pending_comment = nil
       @seen_methods = {}
       @comment_map = {}
+      @relationships = Hash.new { |h, k| h[k] = [] }
+      @file_imports = []
     end
 
     def analyze
@@ -25,10 +27,10 @@ module CogRuby
       visit(result.value)
 
       Scip::Document.new(
-        language: "ruby",
+        language: 'ruby',
         relative_path: @relative_path,
         occurrences: @occurrences,
-        symbols: @symbols
+        symbols: finalize_symbols
       )
     end
 
@@ -41,7 +43,7 @@ module CogRuby
         line = comment.location.start_line
         text = comment.slice
         # Strip leading # and space
-        text = text.sub(/\A#\s?/, "")
+        text = text.sub(/\A#\s?/, '')
         @comment_map[line] = text
       end
     end
@@ -144,9 +146,7 @@ module CogRuby
       add_symbol_info(symbol, Scip::KIND_CLASS, full_name, doc)
 
       # Record superclass reference if present
-      if node.superclass
-        visit(node.superclass)
-      end
+      visit(node.superclass) if node.superclass
 
       @scope_stack.push(type: :class, name: full_name, symbol: symbol)
       visit(node.body) if node.body
@@ -157,7 +157,7 @@ module CogRuby
 
     def visit_singleton_class(node)
       owner = @scope_stack.current_module_name
-      full_name = owner.empty? ? "<singleton>" : "#{owner}.<singleton>"
+      full_name = owner.empty? ? '<singleton>' : "#{owner}.<singleton>"
       symbol = Symbol.module_symbol(@package_name, full_name)
 
       @scope_stack.push(type: :singleton_class, name: owner, symbol: symbol)
@@ -170,7 +170,7 @@ module CogRuby
     def visit_def(node)
       method_name = node.name.to_s
       owner_name = @scope_stack.current_module_name
-      owner_name = "Object" if owner_name.empty?
+      owner_name = 'Object' if owner_name.empty?
 
       params = node.parameters
       arity = compute_arity(params)
@@ -232,7 +232,8 @@ module CogRuby
     end
 
     def define_param(name, loc)
-      return if name.empty? || name == "_"
+      return if name.empty? || name == '_'
+
       symbol = Symbol.local_symbol(@local_counter)
       @local_counter += 1
       range = loc_range(loc)
@@ -246,7 +247,7 @@ module CogRuby
 
     def visit_constant_write(node)
       owner_name = @scope_stack.current_module_name
-      owner_name = "Object" if owner_name.empty?
+      owner_name = 'Object' if owner_name.empty?
       const_name = node.name.to_s
       symbol = Symbol.constant_symbol(@package_name, owner_name, const_name)
       range = loc_range(node.name_loc)
@@ -261,7 +262,7 @@ module CogRuby
     def visit_constant_read(node)
       const_name = node.name.to_s
       owner_name = @scope_stack.current_module_name
-      owner_name = "Object" if owner_name.empty?
+      owner_name = 'Object' if owner_name.empty?
       symbol = Symbol.constant_symbol(@package_name, owner_name, const_name)
       range = node_range(node)
 
@@ -271,7 +272,7 @@ module CogRuby
     def visit_constant_path(node)
       begin
         full_name = node.full_name
-      rescue
+      rescue StandardError
         full_name = node.slice
       end
       symbol = Symbol.module_symbol(@package_name, full_name)
@@ -284,7 +285,7 @@ module CogRuby
 
     def visit_ivar_write(node)
       owner_name = @scope_stack.current_module_name
-      owner_name = "Object" if owner_name.empty?
+      owner_name = 'Object' if owner_name.empty?
       ivar_name = node.name.to_s
       symbol = Symbol.field_symbol(@package_name, owner_name, ivar_name)
       range = loc_range(node.name_loc)
@@ -297,7 +298,7 @@ module CogRuby
 
     def visit_ivar_read(node)
       owner_name = @scope_stack.current_module_name
-      owner_name = "Object" if owner_name.empty?
+      owner_name = 'Object' if owner_name.empty?
       ivar_name = node.name.to_s
       symbol = Symbol.field_symbol(@package_name, owner_name, ivar_name)
       range = node_range(node)
@@ -309,7 +310,7 @@ module CogRuby
 
     def visit_cvar_write(node)
       owner_name = @scope_stack.current_module_name
-      owner_name = "Object" if owner_name.empty?
+      owner_name = 'Object' if owner_name.empty?
       cvar_name = node.name.to_s
       symbol = Symbol.field_symbol(@package_name, owner_name, cvar_name)
       range = loc_range(node.name_loc)
@@ -322,7 +323,7 @@ module CogRuby
 
     def visit_cvar_read(node)
       owner_name = @scope_stack.current_module_name
-      owner_name = "Object" if owner_name.empty?
+      owner_name = 'Object' if owner_name.empty?
       cvar_name = node.name.to_s
       symbol = Symbol.field_symbol(@package_name, owner_name, cvar_name)
       range = node_range(node)
@@ -334,7 +335,7 @@ module CogRuby
 
     def visit_gvar_write(node)
       gvar_name = node.name.to_s
-      symbol = Symbol.field_symbol(@package_name, "", gvar_name)
+      symbol = Symbol.field_symbol(@package_name, '', gvar_name)
       range = loc_range(node.name_loc)
 
       add_occurrence(range, symbol, Scip::ROLE_DEFINITION | Scip::ROLE_WRITE_ACCESS)
@@ -345,7 +346,7 @@ module CogRuby
 
     def visit_gvar_read(node)
       gvar_name = node.name.to_s
-      symbol = Symbol.field_symbol(@package_name, "", gvar_name)
+      symbol = Symbol.field_symbol(@package_name, '', gvar_name)
       range = node_range(node)
 
       add_occurrence(range, symbol, Scip::ROLE_READ_ACCESS)
@@ -388,13 +389,14 @@ module CogRuby
       method_name = node.name.to_s
 
       case method_name
-      when "attr_reader", "attr_writer", "attr_accessor"
+      when 'attr_reader', 'attr_writer', 'attr_accessor'
         visit_attr_call(node, method_name)
-      when "include", "extend", "prepend"
+      when 'include', 'extend', 'prepend'
         visit_mixin_call(node, method_name)
-      when "require", "require_relative"
+      when 'require', 'require_relative'
         visit_require_call(node)
       else
+        add_call_relationship(call_symbol_for(node))
         # Visit receiver and arguments normally
         visit(node.receiver) if node.receiver
         visit_arguments(node.arguments) if node.arguments
@@ -404,11 +406,13 @@ module CogRuby
 
     def visit_attr_call(node, method_name)
       return unless node.arguments
+
       owner_name = @scope_stack.current_module_name
-      owner_name = "Object" if owner_name.empty?
+      owner_name = 'Object' if owner_name.empty?
 
       node.arguments.arguments.each do |arg|
         next unless arg.is_a?(Prism::SymbolNode)
+
         attr_name = arg.value
         ivar_name = "@#{attr_name}"
 
@@ -423,15 +427,16 @@ module CogRuby
         add_symbol_info(field_sym, Scip::KIND_FIELD, ivar_name)
 
         # For writer/accessor, also define the setter
-        if method_name == "attr_writer" || method_name == "attr_accessor"
+        if %w[attr_writer attr_accessor].include?(method_name)
           setter_symbol = Symbol.method_symbol(@package_name, owner_name, "#{attr_name}=", 1)
           add_symbol_info(setter_symbol, Scip::KIND_FUNCTION, "#{attr_name}=/1")
         end
       end
     end
 
-    def visit_mixin_call(node, method_name)
+    def visit_mixin_call(node, _method_name)
       return unless node.arguments
+
       node.arguments.arguments.each do |arg|
         case arg
         when Prism::ConstantReadNode, Prism::ConstantPathNode
@@ -439,13 +444,23 @@ module CogRuby
           symbol = Symbol.module_symbol(@package_name, mod_name)
           range = node_range(arg)
           add_occurrence(range, symbol, Scip::ROLE_IMPORT)
+          add_import_relationship(symbol)
         end
       end
     end
 
     def visit_require_call(node)
-      # Just walk arguments normally — we don't do cross-file resolution
-      visit_arguments(node.arguments) if node.arguments
+      return unless node.arguments
+
+      node.arguments.arguments.each do |arg|
+        next unless arg.respond_to?(:unescaped)
+
+        target = "cog/import/#{arg.unescaped}"
+        add_occurrence(node_range(arg), target, Scip::ROLE_IMPORT)
+        add_import_relationship(target)
+      end
+
+      visit_arguments(node.arguments)
     end
 
     def visit_arguments(args)
@@ -457,11 +472,9 @@ module CogRuby
     def visit_block(node)
       enclosing = @scope_stack.enclosing_symbol
       block_symbol = "#{enclosing}<block>."
-      @scope_stack.push(type: :block, name: "<block>", symbol: block_symbol)
+      @scope_stack.push(type: :block, name: '<block>', symbol: block_symbol)
 
-      if node.parameters
-        visit_block_parameters(node.parameters)
-      end
+      visit_block_parameters(node.parameters) if node.parameters
       visit(node.body) if node.body
       @scope_stack.pop
     end
@@ -469,19 +482,19 @@ module CogRuby
     def visit_lambda(node)
       enclosing = @scope_stack.enclosing_symbol
       lambda_symbol = "#{enclosing}<lambda>."
-      @scope_stack.push(type: :block, name: "<lambda>", symbol: lambda_symbol)
+      @scope_stack.push(type: :block, name: '<lambda>', symbol: lambda_symbol)
 
-      if node.parameters
-        visit_block_parameters(node.parameters)
-      end
+      visit_block_parameters(node.parameters) if node.parameters
       visit(node.body) if node.body
       @scope_stack.pop
     end
 
     def visit_block_parameters(block_params)
       return unless block_params.is_a?(Prism::BlockParametersNode)
+
       params = block_params.parameters
       return unless params
+
       visit_parameters(params)
     end
 
@@ -500,7 +513,7 @@ module CogRuby
           add_symbol_info(symbol, Scip::KIND_VARIABLE, name)
         when Prism::InstanceVariableTargetNode
           owner_name = @scope_stack.current_module_name
-          owner_name = "Object" if owner_name.empty?
+          owner_name = 'Object' if owner_name.empty?
           ivar_name = target.name.to_s
           symbol = Symbol.field_symbol(@package_name, owner_name, ivar_name)
           range = node_range(target)
@@ -520,11 +533,15 @@ module CogRuby
       when Prism::ConstantPathNode
         begin
           node.full_name
-        rescue
+        rescue StandardError
           node.slice
         end
       else
-        node.slice rescue "Unknown"
+        begin
+          node.slice
+        rescue StandardError
+          'Unknown'
+        end
       end
     end
 
@@ -532,7 +549,7 @@ module CogRuby
       parent = @scope_stack.current_module_name
       if parent.empty?
         name
-      elsif name.include?("::")
+      elsif name.include?('::')
         # Already qualified
         name
       else
@@ -542,6 +559,7 @@ module CogRuby
 
     def compute_arity(params)
       return 0 unless params
+
       count = 0
       count += params.requireds.size
       count += params.optionals.size
@@ -553,7 +571,7 @@ module CogRuby
 
     def node_range(node)
       loc = node.location
-      start_line = loc.start_line - 1  # 0-indexed
+      start_line = loc.start_line - 1 # 0-indexed
       start_col = loc.start_column
       end_line = loc.end_line - 1
       end_col = loc.end_column
@@ -567,6 +585,7 @@ module CogRuby
 
     def loc_range(loc)
       return [0, 0, 0] unless loc
+
       start_line = loc.start_line - 1
       start_col = loc.start_column
       end_line = loc.end_line - 1
@@ -598,6 +617,59 @@ module CogRuby
         documentation: documentation,
         enclosing_symbol: enc
       )
+    end
+
+    def finalize_symbols
+      @symbols.map do |sym|
+        relationships = @relationships[sym.symbol].dup
+        relationships.concat(@file_imports) if sym.enclosing_symbol.to_s.empty?
+        sym.relationships = dedupe_relationships(relationships)
+        sym
+      end
+    end
+
+    def dedupe_relationships(relationships)
+      relationships.uniq { |rel| [rel.symbol, rel.kind, rel.is_reference, rel.is_definition] }
+    end
+
+    def add_import_relationship(target_symbol)
+      rel = Scip::Relationship.new(symbol: target_symbol, kind: 'imports')
+      owner = @scope_stack.enclosing_symbol
+      if owner.nil? || owner.empty?
+        @file_imports << rel
+      else
+        @relationships[owner] << rel
+      end
+    end
+
+    def add_call_relationship(target_symbol)
+      return if target_symbol.nil? || target_symbol.empty?
+
+      owner = @scope_stack.enclosing_symbol
+      return if owner.nil? || owner.empty?
+
+      @relationships[owner] << Scip::Relationship.new(
+        symbol: target_symbol,
+        is_reference: true,
+        kind: 'calls'
+      )
+    end
+
+    def call_symbol_for(node)
+      method_name = node.name.to_s
+      return nil if method_name.empty?
+
+      owner_name =
+        case node.receiver
+        when Prism::ConstantReadNode, Prism::ConstantPathNode
+          extract_constant_name(node.receiver)
+        else
+          current = @scope_stack.current_module_name
+          current.empty? ? 'Object' : current
+        end
+
+      arity = node.arguments ? node.arguments.arguments.length : 0
+      Symbol.method_symbol(@package_name, owner_name, method_name, arity)
     end
   end
 end
