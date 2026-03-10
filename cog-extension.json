@@ -1,7 +1,7 @@
 {
   "name": "cog-ruby",
   "extensions": [".rb", ".rake", ".gemspec"],
-  "args": ["{file}", "--output", "{output}"],
+  "args": ["--output", "{output}", "{files}"],
   "build": "chmod +x bin/cog-ruby",
   "language_names": ["ruby"],
   "debugger": {

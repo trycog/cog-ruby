@@ -108,20 +108,22 @@ Requires the [`debug`](https://github.com/ruby/debug) gem (`gem install debug`).
 
 ## How It Works
 
-Cog invokes `cog-ruby` once per file. The script discovers the project context and runs the indexer:
+Cog invokes `cog-ruby` once per extension group. It expands matched files onto
+argv, the script fans parsing work out across Ruby threads, and it emits
+per-file progress events on stderr as files complete:
 
 ```
-cog invokes:      bin/cog-ruby <file_path> --output <output_path>
-script executes:  Prism parse + AST walk for exactly one document
+cog invokes:      bin/cog-ruby --output <output_path> <file_path> [file_path ...]
+script executes:  Prism parse + AST walk for one or more documents
 ```
 
 **Auto-discovery:**
 
 | Step | Logic |
 |------|-------|
-| Workspace root | Walks up from input file looking for `Gemfile`, then `*.gemspec`, then `.git` (fallback: file parent directory). |
+| Workspace root | Walks up from each input file looking for `Gemfile`, then `*.gemspec`, then `.git` (fallback: file parent directory). |
 | Package name | Parsed from gemspec `.name = "..."` field. Falls back to workspace directory name. |
-| Indexed target | The exact file passed in `{file}`; output is a SCIP protobuf containing one document. |
+| Indexed target | Every file expanded from `{files}`; output is one SCIP protobuf containing one document per input file. |
 
 ### Architecture
 
@@ -149,14 +151,14 @@ Zero external dependencies — uses only Prism, which is built into Ruby 3.3+.
 ### Run from source
 
 ```sh
-bin/cog-ruby /path/to/file.rb --output /tmp/index.scip
+bin/cog-ruby --output /tmp/index.scip /path/to/file.rb /path/to/other.rb
 ```
 
 ### Manual verification
 
 ```sh
 # Generate SCIP output
-bin/cog-ruby test/fixtures/sample.rb --output /tmp/test.scip
+bin/cog-ruby --output /tmp/test.scip test/fixtures/sample.rb
 
 # Inspect with protoc
 protoc --decode_raw < /tmp/test.scip

@@ -5,27 +5,23 @@ module CogRuby
     module_function
 
     def parse(args)
-      file_path = nil
+      file_paths = []
       output_path = nil
       i = 0
 
       while i < args.length
-        if args[i] == "--output" && i + 1 < args.length
+        if args[i] == '--output' && i + 1 < args.length
           output_path = args[i + 1]
           i += 2
-        elsif file_path.nil?
-          file_path = args[i]
-          i += 1
         else
+          file_paths << args[i]
           i += 1
         end
       end
 
-      if file_path && output_path
-        { file_path: file_path, output_path: output_path }
-      else
-        nil
-      end
+      return unless !file_paths.empty? && output_path
+
+      { file_paths: file_paths, output_path: output_path }
     end
   end
 end
