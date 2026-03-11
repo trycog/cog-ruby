@@ -174,7 +174,9 @@ COG_RUBY_DEBUG=1 bin/cog-ruby --output /tmp/test.scip test/fixtures/sample.rb 2>
 
 With `COG_RUBY_DEBUG=1`, the indexer emits debug events for batch start/finish,
 per-file start/finish, read/analyze stage timings, watchdog `file_still_running`
-events, and memory snapshots.
+events, and memory snapshots. When run through `cog code:index` with Cog debug
+logging enabled, those non-progress stderr lines are forwarded into
+`.cog/cog.log` while progress JSON continues to drive the live TUI.
 
 ### Install locally
 
