@@ -1,1 +1,4 @@
 /tmp
+.claude/
+.opencode/
+opencode.*
