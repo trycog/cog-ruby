@@ -1,5 +1,6 @@
 {
   "name": "cog-ruby",
+  "version": "0.1.0",
   "extensions": [".rb", ".rake", ".gemspec"],
   "args": ["--output", "{output}", "{files}"],
   "build": "chmod +x bin/cog-ruby",

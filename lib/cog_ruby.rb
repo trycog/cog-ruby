@@ -11,7 +11,13 @@ require_relative 'cog_ruby/cli'
 require_relative 'cog_ruby/analyzer'
 
 module CogRuby
-  VERSION = '0.1.0'
+  EXTENSION_METADATA = File.expand_path('../cog-extension.json', __dir__)
+  VERSION = begin
+    metadata = JSON.parse(File.read(EXTENSION_METADATA))
+    metadata.fetch('version')
+  rescue StandardError => e
+    raise "failed to read version from cog-extension.json: #{e.message}"
+  end
   WATCHDOG_INTERVAL = 5
 
   def self.main(args)

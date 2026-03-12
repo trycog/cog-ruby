@@ -22,10 +22,15 @@ SCIP-based code intelligence for Ruby projects using [Prism](https://github.com/
 ### Install
 
 ```sh
-cog install https://github.com/trycog/cog-ruby.git
+cog ext:install https://github.com/trycog/cog-ruby.git
+cog ext:install https://github.com/trycog/cog-ruby --version=0.1.0
+cog ext:update
+cog ext:update cog-ruby
 ```
 
-No compilation step — Cog runs `chmod +x bin/cog-ruby` and the extension is ready.
+Cog downloads the tagged GitHub release tarball, then finalizes the local install with `chmod +x bin/cog-ruby`. `--version` matches an exact release version after optional `v` prefix normalization.
+
+The extension version is defined once in `cog-extension.json`; the Ruby runtime reads that version from the manifest, release tags use `vX.Y.Z`, and the install flag uses the matching bare semver `X.Y.Z`.
 
 ---
 
@@ -181,8 +186,19 @@ logging enabled, those non-progress stderr lines are forwarded into
 ### Install locally
 
 ```sh
-cog install .
+mkdir -p ~/.config/cog/extensions/cog-ruby
+cp -R . ~/.config/cog/extensions/cog-ruby
+chmod +x ~/.config/cog/extensions/cog-ruby/bin/cog-ruby
 ```
+
+For normal use, Cog downloads the GitHub release source tarball first and then runs the manifest build command locally.
+
+### Release
+
+- Set the next version in `cog-extension.json`
+- Tag releases as `vX.Y.Z` to match Cog's exact-version install flow
+- Pushing a matching tag triggers GitHub Actions to verify the tag against `cog-extension.json`, run tests, and create a GitHub Release
+- Cog installs from the release source tarball, but the extension still finalizes locally after download
 
 ---
 
